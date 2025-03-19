@@ -13,11 +13,16 @@ import (
 	"github.com/bobg/errors"
 )
 
+// Client is the type of a client for talking to a Go module proxy.
 type Client struct {
 	baseURL string
 	client  *http.Client
 }
 
+// New creates a new [Client] for the Go module proxy at the given URL.
+// If client is non-nil, it will use that HTTP client,
+// otherwise it will use a default client
+// (a distinct one from [http.DefaultClient]).
 func New(url string, client *http.Client) *Client {
 	url = strings.TrimRight(url, "/")
 	if client == nil {
@@ -26,6 +31,7 @@ func New(url string, client *http.Client) *Client {
 	return &Client{baseURL: url, client: client}
 }
 
+// List lists the available versions of a Go module.
 func (c Client) List(ctx context.Context, modpath string) ([]string, error) {
 	q := fmt.Sprintf("%s/%s/@v/list", c.baseURL, modpath)
 
@@ -54,15 +60,29 @@ func (c Client) List(ctx context.Context, modpath string) ([]string, error) {
 	return versions, errors.Wrapf(sc.Err(), "scanning response from GET %s", q)
 }
 
-func (c Client) Info(ctx context.Context, modpath, version string) (string, time.Time, map[string]any, error) {
+// Info gets information about a specific version of a Go module.
+// A Go module proxy produces a JSON object with Version and Time fields,
+// and possibly others.
+//
+// This function returns the canonical version string, the timestamp for that version,
+// and a map of all the fields parsed from the JSON object.
+//
+// The returned version may be different from the one supplied as an argument,
+// which is not required to be canonical.
+// (It may be a branch name or commit hash, for example.)
+//
+// The values in the map are unparsed JSON that can be further decoded with calls to [json.Unmarshal].
+func (c Client) Info(ctx context.Context, modpath, version string) (string, time.Time, map[string]json.RawMessage, error) {
 	q := fmt.Sprintf("%s/%s/@v/%s.info", c.baseURL, modpath, version)
 	return c.handleInfoRequest(ctx, q)
 }
 
+// Mod gets the go.mod file for a specific version of a Go module.
 func (c Client) Mod(ctx context.Context, modpath, version string) (io.ReadCloser, error) {
 	return c.getContent(ctx, modpath, version, "mod")
 }
 
+// Zip gets the contents of a specific version of a Go module as a zip file.
 func (c Client) Zip(ctx context.Context, modpath, version string) (io.ReadCloser, error) {
 	return c.getContent(ctx, modpath, version, "zip")
 }
@@ -88,12 +108,14 @@ func (c Client) getContent(ctx context.Context, modpath, version, suffix string)
 	return resp.Body, nil
 }
 
-func (c Client) Latest(ctx context.Context, modpath string) (string, time.Time, map[string]any, error) {
+// Latest gets info about the latest version of a Go module.
+// Its return values are the same as for [Info].
+func (c Client) Latest(ctx context.Context, modpath string) (string, time.Time, map[string]json.RawMessage, error) {
 	q := fmt.Sprintf("%s/%s/@latest", c.baseURL, modpath)
 	return c.handleInfoRequest(ctx, q)
 }
 
-func (c Client) handleInfoRequest(ctx context.Context, q string) (string, time.Time, map[string]any, error) {
+func (c Client) handleInfoRequest(ctx context.Context, q string) (string, time.Time, map[string]json.RawMessage, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", q, nil)
 	if err != nil {
 		return "", time.Time{}, nil, errors.Wrapf(err, "creating GET %s request", q)
@@ -123,7 +145,7 @@ func (c Client) handleInfoRequest(ctx context.Context, q string) (string, time.T
 		return "", time.Time{}, nil, errors.Wrapf(err, "unmarshaling response body from GET %s", q)
 	}
 
-	var m map[string]any
+	var m map[string]json.RawMessage
 	if err := json.Unmarshal(body, &m); err != nil {
 		return "", time.Time{}, nil, errors.Wrapf(err, "unmarshaling response body from GET %s", q)
 	}
