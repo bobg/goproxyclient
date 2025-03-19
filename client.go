@@ -23,12 +23,12 @@ type Client struct {
 // If client is non-nil, it will use that HTTP client,
 // otherwise it will use a default client
 // (a distinct one from [http.DefaultClient]).
-func New(url string, client *http.Client) *Client {
+func New(url string, client *http.Client) Client {
 	url = strings.TrimRight(url, "/")
 	if client == nil {
 		client = &http.Client{}
 	}
-	return &Client{baseURL: url, client: client}
+	return Client{baseURL: url, client: client}
 }
 
 // List lists the available versions of a Go module.

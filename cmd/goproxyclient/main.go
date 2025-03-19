@@ -45,7 +45,7 @@ func run() error {
 }
 
 type maincmd struct {
-	cl *goproxyclient.Client
+	cl goproxyclient.Client
 }
 
 func (c maincmd) Subcmds() subcmd.Map {
