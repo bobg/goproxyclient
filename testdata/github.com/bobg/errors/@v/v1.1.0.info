@@ -1,0 +1,10 @@
+{
+  "Version": "v1.1.0",
+  "Time": "2024-05-15T17:43:47Z",
+  "Origin": {
+    "VCS": "git",
+    "URL": "https://github.com/bobg/errors",
+    "Ref": "refs/tags/v1.1.0",
+    "Hash": "5f4da70b6f54a67a812f2af5ec8ca9e3291c3d0b"
+  }
+}

@@ -28,20 +28,16 @@ func run() error {
 	if goproxy == "" {
 		goproxy = "https://proxy.golang.org"
 	}
-	parts := strings.Split(goproxy, ",")
-	if len(parts) > 1 {
-		goproxy = parts[0]
-	}
 
 	flag.StringVar(&goproxy, "proxy", goproxy, "Go module proxy URL")
 	flag.Parse()
 
-	var (
-		cl = goproxyclient.New(goproxy, nil)
-		c  = maincmd{cl: cl}
-	)
+	cl, err := goproxyclient.NewMulti(goproxy, nil)
+	if err != nil {
+		return errors.Wrap(err, "creating client")
+	}
 
-	return subcmd.Run(context.Background(), c, flag.Args())
+	return subcmd.Run(context.Background(), maincmd{cl: cl}, flag.Args())
 }
 
 type maincmd struct {

@@ -1,0 +1,10 @@
+{
+  "Version": "v1.9.0",
+  "Time": "2025-03-22T17:50:33Z",
+  "Origin": {
+    "VCS": "git",
+    "URL": "https://github.com/bobg/mid",
+    "Hash": "e78daf091cd3f92e28687e4e5728845c73d2e4ff",
+    "Ref": "refs/tags/v1.9.0"
+  }
+}

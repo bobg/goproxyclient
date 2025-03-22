@@ -1,5 +1,7 @@
 github.com/bobg/errors v1.1.0 h1:gsVanPzJMpZQpwY+27/GQYElZez5CuMYwiIpk2A3RGw=
 github.com/bobg/errors v1.1.0/go.mod h1:Q4775qBZpnte7EGFJqmvnlB1U4pkI1XmU3qxqdp7Zcc=
+github.com/bobg/mid v1.9.0 h1:26kRsHlQFB8BHFxvAbEULK/M//dOrt5+CsfxYbk5rAA=
+github.com/bobg/mid v1.9.0/go.mod h1:hMoUz0up+yjeiO9qvI3P7Ppzk/5/5uBX29GHFkBxvos=
 github.com/bobg/subcmd/v2 v2.3.0 h1:7Pq4GUN4jYwkOguz1a64r6gyVxQpNoqegAquG9CG8wQ=
 github.com/bobg/subcmd/v2 v2.3.0/go.mod h1:fjEpI7mfn8eXEoQ7+lx+dA22sebrbrIa1VMzplZzjpE=
 github.com/google/go-cmp v0.5.6 h1:BKbKCqvP6I+rmFHt06ZmyQtvB8xAkWdhFyr0ZUNZcxQ=

@@ -2,6 +2,8 @@
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/bobg/goproxyclient.svg)](https://pkg.go.dev/github.com/bobg/goproxyclient)
 [![Go Report Card](https://goreportcard.com/badge/github.com/bobg/goproxyclient)](https://goreportcard.com/report/github.com/bobg/goproxyclient)
+[![Tests](https://github.com/bobg/goproxyclient/actions/workflows/go.yml/badge.svg)](https://github.com/bobg/goproxyclient/actions/workflows/go.yml)
+[![Coverage Status](https://coveralls.io/repos/github/bobg/goproxyclient/badge.svg?branch=master)](https://coveralls.io/github/bobg/goproxyclient?branch=master)
 
 This is goproxyclient,
 a library and command-line tool
