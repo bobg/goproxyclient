@@ -1,3 +1,4 @@
+// Package goproxyclient provides a client for talking to Go module proxies.
 package goproxyclient
 
 import (
@@ -14,10 +15,32 @@ import (
 //
 // A method encountering an HTTP error is required to return a [CodeErr] with the HTTP status code.
 type Client interface {
+	// Info gets information about a specific version of a Go module.
+	// A Go module proxy produces a JSON object with Version and Time fields,
+	// and possibly others.
+	//
+	// This function returns the canonical version string, the timestamp for that version,
+	// and a map of all the fields parsed from the JSON object.
+	//
+	// The returned version may be different from the one supplied as an argument,
+	// which is not required to be canonical.
+	// (It may be a branch name or commit hash, for example.)
+	//
+	// The values in the map are unparsed JSON that can be further decoded with calls to [json.Unmarshal].
 	Info(ctx context.Context, mod, ver string) (string, time.Time, map[string]json.RawMessage, error)
+
+	// Latest gets info about the latest version of a Go module.
+	// Its return values are the same as for [Client.Info].
 	Latest(ctx context.Context, mod string) (string, time.Time, map[string]json.RawMessage, error)
+
+	// List lists the available versions of a Go module.
+	// The result is sorted in semver order.
 	List(context.Context, string) ([]string, error)
+
+	// Mod gets the go.mod file for a specific version of a Go module.
 	Mod(ctx context.Context, mod, ver string) (io.ReadCloser, error)
+
+	// Zip gets the contents of a specific version of a Go module as a zip file.
 	Zip(ctx context.Context, mod, ver string) (io.ReadCloser, error)
 }
 
