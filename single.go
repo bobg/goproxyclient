@@ -20,17 +20,7 @@ type single struct {
 	client  *http.Client
 }
 
-var _ Client = single{}
-
-// Ensure we're using a recent-enough version of the mid package.
-var _ CodeErr = mid.CodeErr{}
-
-// New creates a new [Client] for the Go module proxy at the given URL.
-//
-// If hc is non-nil, it will use that HTTP client,
-// otherwise it will use a default client
-// (a distinct one from [http.DefaultClient]).
-func New(url string, hc *http.Client) Client {
+func newSingle(url string, hc *http.Client) single {
 	url = strings.TrimRight(url, "/")
 	if hc == nil {
 		hc = &http.Client{}
@@ -38,17 +28,15 @@ func New(url string, hc *http.Client) Client {
 	return single{baseURL: url, client: hc}
 }
 
-// List lists the available versions of a Go module.
-// The result is sorted in semver order.
-func (c single) List(ctx context.Context, modpath string) ([]string, error) {
-	q := fmt.Sprintf("%s/%s/@v/list", c.baseURL, modpath)
+func (s single) list(ctx context.Context, modpath string) ([]string, error) {
+	q := fmt.Sprintf("%s/%s/@v/list", s.baseURL, modpath)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", q, nil)
 	if err != nil {
 		return nil, errors.Wrapf(err, "creating GET %s request", q)
 	}
 
-	resp, err := c.client.Do(req)
+	resp, err := s.client.Do(req)
 	if err != nil {
 		return nil, errors.Wrapf(err, "in GET %s", q)
 	}
@@ -69,42 +57,28 @@ func (c single) List(ctx context.Context, modpath string) ([]string, error) {
 	return versions, errors.Wrapf(sc.Err(), "scanning response from GET %s", q)
 }
 
-// Info gets information about a specific version of a Go module.
-// A Go module proxy produces a JSON object with Version and Time fields,
-// and possibly others.
-//
-// This function returns the canonical version string, the timestamp for that version,
-// and a map of all the fields parsed from the JSON object.
-//
-// The returned version may be different from the one supplied as an argument,
-// which is not required to be canonical.
-// (It may be a branch name or commit hash, for example.)
-//
-// The values in the map are unparsed JSON that can be further decoded with calls to [json.Unmarshal].
-func (c single) Info(ctx context.Context, modpath, version string) (string, time.Time, map[string]json.RawMessage, error) {
-	q := fmt.Sprintf("%s/%s/@v/%s.info", c.baseURL, modpath, version)
-	return c.handleInfoRequest(ctx, q)
+func (s single) info(ctx context.Context, modpath, version string) (string, time.Time, map[string]json.RawMessage, error) {
+	q := fmt.Sprintf("%s/%s/@v/%s.info", s.baseURL, modpath, version)
+	return s.handleInfoRequest(ctx, q)
 }
 
-// Mod gets the go.mod file for a specific version of a Go module.
-func (c single) Mod(ctx context.Context, modpath, version string) (io.ReadCloser, error) {
-	return c.getContent(ctx, modpath, version, "mod")
+func (s single) mod(ctx context.Context, modpath, version string) (io.ReadCloser, error) {
+	return s.getContent(ctx, modpath, version, "mod")
 }
 
-// Zip gets the contents of a specific version of a Go module as a zip file.
-func (c single) Zip(ctx context.Context, modpath, version string) (io.ReadCloser, error) {
-	return c.getContent(ctx, modpath, version, "zip")
+func (s single) zip(ctx context.Context, modpath, version string) (io.ReadCloser, error) {
+	return s.getContent(ctx, modpath, version, "zip")
 }
 
-func (c single) getContent(ctx context.Context, modpath, version, suffix string) (io.ReadCloser, error) {
-	q := fmt.Sprintf("%s/%s/@v/%s.%s", c.baseURL, modpath, version, suffix)
+func (s single) getContent(ctx context.Context, modpath, version, suffix string) (io.ReadCloser, error) {
+	q := fmt.Sprintf("%s/%s/@v/%s.%s", s.baseURL, modpath, version, suffix)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", q, nil)
 	if err != nil {
 		return nil, errors.Wrapf(err, "creating GET %s request", q)
 	}
 
-	resp, err := c.client.Do(req)
+	resp, err := s.client.Do(req)
 	if err != nil {
 		return nil, errors.Wrapf(err, "in GET %s", q)
 	}
@@ -119,18 +93,18 @@ func (c single) getContent(ctx context.Context, modpath, version, suffix string)
 
 // Latest gets info about the latest version of a Go module.
 // Its return values are the same as for [Info].
-func (c single) Latest(ctx context.Context, modpath string) (string, time.Time, map[string]json.RawMessage, error) {
-	q := fmt.Sprintf("%s/%s/@latest", c.baseURL, modpath)
-	return c.handleInfoRequest(ctx, q)
+func (s single) latest(ctx context.Context, modpath string) (string, time.Time, map[string]json.RawMessage, error) {
+	q := fmt.Sprintf("%s/%s/@latest", s.baseURL, modpath)
+	return s.handleInfoRequest(ctx, q)
 }
 
-func (c single) handleInfoRequest(ctx context.Context, q string) (string, time.Time, map[string]json.RawMessage, error) {
+func (s single) handleInfoRequest(ctx context.Context, q string) (string, time.Time, map[string]json.RawMessage, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", q, nil)
 	if err != nil {
 		return "", time.Time{}, nil, errors.Wrapf(err, "creating GET %s request", q)
 	}
 
-	resp, err := c.client.Do(req)
+	resp, err := s.client.Do(req)
 	if err != nil {
 		return "", time.Time{}, nil, errors.Wrapf(err, "in GET %s", q)
 	}

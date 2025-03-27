@@ -32,10 +32,7 @@ func run() error {
 	flag.StringVar(&goproxy, "proxy", goproxy, "Go module proxy URL")
 	flag.Parse()
 
-	cl, err := goproxyclient.NewMulti(goproxy, nil)
-	if err != nil {
-		return errors.Wrap(err, "creating client")
-	}
+	cl := goproxyclient.New(goproxy, nil)
 
 	return subcmd.Run(context.Background(), maincmd{cl: cl}, flag.Args())
 }

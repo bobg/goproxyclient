@@ -5,6 +5,7 @@ import (
 	"embed"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -14,6 +15,7 @@ import (
 	"time"
 
 	"github.com/bobg/mid"
+	"github.com/google/go-cmp/cmp"
 )
 
 func TestClients(t *testing.T) {
@@ -34,15 +36,15 @@ func TestClients(t *testing.T) {
 	)
 
 	t.Run("single", func(t *testing.T) {
-		cl := New(s1.URL, nil)
+		cl := newSingle(s1.URL, nil)
 
 		t.Run("latest", func(t *testing.T) {
-			ver, tm, _, err := cl.Latest(ctx, "github.com/bobg/errors")
+			ver, tm, _, err := cl.latest(ctx, "github.com/bobg/errors")
 			if err != nil {
 				t.Fatal(err)
 			}
 			if ver != wantErrorsVersion {
-				t.Errorf("got %q, want v1.1.0", wantErrorsVersion)
+				t.Errorf("got %q, want %q", ver, wantErrorsVersion)
 			}
 			if !tm.Equal(wantErrorsTime) {
 				t.Errorf("got %s, want %s", tm, wantErrorsTime)
@@ -50,7 +52,7 @@ func TestClients(t *testing.T) {
 		})
 
 		t.Run("list", func(t *testing.T) {
-			versions, err := cl.List(ctx, "github.com/bobg/errors")
+			versions, err := cl.list(ctx, "github.com/bobg/errors")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -60,20 +62,37 @@ func TestClients(t *testing.T) {
 		})
 
 		t.Run("info", func(t *testing.T) {
-			ver, tm, _, err := cl.Info(ctx, "github.com/bobg/errors", wantErrorsVersion)
+			ver, tm, _, err := cl.info(ctx, "github.com/bobg/errors", wantErrorsVersion)
 			if err != nil {
 				t.Fatal(err)
 			}
 			if ver != wantErrorsVersion {
-				t.Errorf("got %q, want v1.1.0", wantErrorsVersion)
+				t.Errorf("got %q, want %s", ver, wantErrorsVersion)
 			}
 			if !tm.Equal(wantErrorsTime) {
 				t.Errorf("got %s, want %s", tm, wantErrorsTime)
 			}
 		})
 
+		t.Run("mod", func(t *testing.T) {
+			rc, err := cl.mod(ctx, "github.com/bobg/errors", wantErrorsVersion)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer rc.Close()
+
+			got, err := io.ReadAll(rc)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if diff := cmp.Diff(errorsMod, string(got)); diff != "" {
+				t.Errorf("mod mismatch (-want +got):\n%s", diff)
+			}
+		})
+
 		t.Run("not_found", func(t *testing.T) {
-			_, err := cl.List(ctx, "github.com/bobg/mid")
+			_, err := cl.list(ctx, "github.com/bobg/mid")
 			if err == nil {
 				t.Fatal("got nil, want error")
 			}
@@ -83,7 +102,7 @@ func TestClients(t *testing.T) {
 		})
 
 		t.Run("forbidden", func(t *testing.T) {
-			_, err := cl.List(ctx, "github.com/bobg/subcmd/v2")
+			_, err := cl.list(ctx, "github.com/bobg/subcmd/v2")
 			if err == nil {
 				t.Fatal("got nil, want error")
 			}
@@ -144,10 +163,7 @@ func TestClients(t *testing.T) {
 
 	t.Run("multi", func(t *testing.T) {
 		t.Run("after_any_error", func(t *testing.T) {
-			cl, err := NewMulti(fmt.Sprintf("%s|%s", s1.URL, s2.URL), nil)
-			if err != nil {
-				t.Fatal(err)
-			}
+			cl := New(fmt.Sprintf("%s|%s", s1.URL, s2.URL), nil)
 
 			t.Run("mid", func(t *testing.T) {
 				t.Run("latest", func(t *testing.T) {
@@ -156,7 +172,7 @@ func TestClients(t *testing.T) {
 						t.Fatal(err)
 					}
 					if ver != wantMidVersion {
-						t.Errorf("got %q, want v1.1.0", wantMidVersion)
+						t.Errorf("got %q, want %q", ver, wantMidVersion)
 					}
 					if !tm.Equal(wantMidTime) {
 						t.Errorf("got %s, want %s", tm, wantMidTime)
@@ -178,10 +194,27 @@ func TestClients(t *testing.T) {
 						t.Fatal(err)
 					}
 					if ver != wantMidVersion {
-						t.Errorf("got %q, want v1.1.0", wantMidVersion)
+						t.Errorf("got %q, want %q", ver, wantMidVersion)
 					}
 					if !tm.Equal(wantMidTime) {
 						t.Errorf("got %s, want %s", tm, wantMidTime)
+					}
+				})
+
+				t.Run("mod", func(t *testing.T) {
+					rc, err := cl.Mod(ctx, "github.com/bobg/mid", wantMidVersion)
+					if err != nil {
+						t.Fatal(err)
+					}
+					defer rc.Close()
+
+					got, err := io.ReadAll(rc)
+					if err != nil {
+						t.Fatal(err)
+					}
+
+					if diff := cmp.Diff(midMod, string(got)); diff != "" {
+						t.Errorf("mod mismatch (-want +got):\n%s", diff)
 					}
 				})
 			})
@@ -193,7 +226,7 @@ func TestClients(t *testing.T) {
 						t.Fatal(err)
 					}
 					if ver != wantSubcmdVersion {
-						t.Errorf("got %q, want v1.1.0", wantSubcmdVersion)
+						t.Errorf("got %q, want %q", ver, wantSubcmdVersion)
 					}
 					if !tm.Equal(wantSubcmdTime) {
 						t.Errorf("got %s, want %s", tm, wantSubcmdTime)
@@ -215,20 +248,34 @@ func TestClients(t *testing.T) {
 						t.Fatal(err)
 					}
 					if ver != wantSubcmdVersion {
-						t.Errorf("got %q, want v1.1.0", wantSubcmdVersion)
+						t.Errorf("got %q, want %q", ver, wantSubcmdVersion)
 					}
 					if !tm.Equal(wantSubcmdTime) {
 						t.Errorf("got %s, want %s", tm, wantSubcmdTime)
+					}
+				})
+
+				t.Run("mod", func(t *testing.T) {
+					rc, err := cl.Mod(ctx, "github.com/bobg/subcmd/v2", wantSubcmdVersion)
+					if err != nil {
+						t.Fatal(err)
+					}
+					defer rc.Close()
+
+					got, err := io.ReadAll(rc)
+					if err != nil {
+						t.Fatal(err)
+					}
+
+					if diff := cmp.Diff(subcmdMod, string(got)); diff != "" {
+						t.Errorf("mod mismatch (-want +got):\n%s", diff)
 					}
 				})
 			})
 		})
 
 		t.Run("after_not_found", func(t *testing.T) {
-			cl, err := NewMulti(fmt.Sprintf("%s,%s", s1.URL, s2.URL), nil)
-			if err != nil {
-				t.Fatal(err)
-			}
+			cl := New(fmt.Sprintf("%s,%s", s1.URL, s2.URL), nil)
 
 			t.Run("mid", func(t *testing.T) {
 				t.Run("latest", func(t *testing.T) {
@@ -237,12 +284,13 @@ func TestClients(t *testing.T) {
 						t.Fatal(err)
 					}
 					if ver != wantMidVersion {
-						t.Errorf("got %q, want v1.1.0", wantMidVersion)
+						t.Errorf("got %q, want %q", ver, wantMidVersion)
 					}
 					if !tm.Equal(wantMidTime) {
 						t.Errorf("got %s, want %s", tm, wantMidTime)
 					}
 				})
+
 				t.Run("list", func(t *testing.T) {
 					versions, err := cl.List(ctx, "github.com/bobg/mid")
 					if err != nil {
@@ -259,10 +307,27 @@ func TestClients(t *testing.T) {
 						t.Fatal(err)
 					}
 					if ver != wantMidVersion {
-						t.Errorf("got %q, want v1.1.0", wantMidVersion)
+						t.Errorf("got %q, want %q", ver, wantMidVersion)
 					}
 					if !tm.Equal(wantMidTime) {
 						t.Errorf("got %s, want %s", tm, wantMidTime)
+					}
+				})
+
+				t.Run("mod", func(t *testing.T) {
+					rc, err := cl.Mod(ctx, "github.com/bobg/mid", wantMidVersion)
+					if err != nil {
+						t.Fatal(err)
+					}
+					defer rc.Close()
+
+					got, err := io.ReadAll(rc)
+					if err != nil {
+						t.Fatal(err)
+					}
+
+					if diff := cmp.Diff(midMod, string(got)); diff != "" {
+						t.Errorf("mod mismatch (-want +got):\n%s", diff)
 					}
 				})
 			})
@@ -302,6 +367,21 @@ func TestClients(t *testing.T) {
 						t.Errorf("got %d, want %d", codeErr.Code(), http.StatusForbidden)
 					}
 				})
+
+				t.Run("mod", func(t *testing.T) {
+					rc, err := cl.Mod(ctx, "github.com/bobg/subcmd/v2", wantSubcmdVersion)
+					if err == nil {
+						rc.Close()
+						t.Fatal("got nil, want error")
+					}
+					var codeErr CodeErr
+					if !errors.As(err, &codeErr) {
+						t.Fatalf("got %v, want a CodeErr", err)
+					}
+					if code := codeErr.Code(); code != http.StatusForbidden {
+						t.Errorf("got %d, want %d", codeErr.Code(), http.StatusForbidden)
+					}
+				})
 			})
 		})
 	})
@@ -323,3 +403,12 @@ func testHandler(shortcircuit map[string]int) http.Handler {
 
 //go:embed testdata
 var testdata embed.FS
+
+//go:embed testdata/github.com/bobg/errors/@v/v1.1.0.mod
+var errorsMod string
+
+//go:embed testdata/github.com/bobg/mid/@v/v1.9.0.mod
+var midMod string
+
+//go:embed testdata/github.com/bobg/subcmd/v2/@v/v2.3.0.mod
+var subcmdMod string
