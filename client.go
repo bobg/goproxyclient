@@ -4,13 +4,14 @@ package goproxyclient
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"io"
 	"net/http"
 	"strings"
 	"time"
 
+	"github.com/bobg/errors"
 	"github.com/bobg/mid"
+	"golang.org/x/mod/module"
 )
 
 // Client is a client for talking to a sequence of one or more Go module proxies.
@@ -137,6 +138,15 @@ func (cl Client) Info(ctx context.Context, mod, ver string) (string, time.Time, 
 		err          error
 	)
 
+	mod, err = module.EscapePath(mod)
+	if err != nil {
+		return "", tm, nil, errors.Wrap(err, "escaping module path")
+	}
+	ver, err = module.EscapeVersion(ver)
+	if err != nil {
+		return "", tm, nil, errors.Wrap(err, "escaping module version")
+	}
+
 	cl.loop(&err, func(s single) {
 		canonicalVer, tm, j, err = s.info(ctx, mod, ver)
 	})
@@ -154,6 +164,11 @@ func (cl Client) Latest(ctx context.Context, mod string) (string, time.Time, map
 		err          error
 	)
 
+	mod, err = module.EscapePath(mod)
+	if err != nil {
+		return "", tm, nil, errors.Wrap(err, "escaping module path")
+	}
+
 	cl.loop(&err, func(s single) {
 		canonicalVer, tm, j, err = s.latest(ctx, mod)
 	})
@@ -170,6 +185,11 @@ func (cl Client) List(ctx context.Context, mod string) ([]string, error) {
 		err      error
 	)
 
+	mod, err = module.EscapePath(mod)
+	if err != nil {
+		return nil, errors.Wrap(err, "escaping module path")
+	}
+
 	cl.loop(&err, func(s single) {
 		versions, err = s.list(ctx, mod)
 	})
@@ -184,6 +204,15 @@ func (cl Client) Mod(ctx context.Context, mod, ver string) (io.ReadCloser, error
 		err error
 	)
 
+	mod, err = module.EscapePath(mod)
+	if err != nil {
+		return nil, errors.Wrap(err, "escaping module path")
+	}
+	ver, err = module.EscapeVersion(ver)
+	if err != nil {
+		return nil, errors.Wrap(err, "escaping module version")
+	}
+
 	cl.loop(&err, func(s single) {
 		rc, err = s.mod(ctx, mod, ver)
 	})
@@ -197,6 +226,15 @@ func (cl Client) Zip(ctx context.Context, mod, ver string) (io.ReadCloser, error
 		rc  io.ReadCloser
 		err error
 	)
+
+	mod, err = module.EscapePath(mod)
+	if err != nil {
+		return nil, errors.Wrap(err, "escaping module path")
+	}
+	ver, err = module.EscapeVersion(ver)
+	if err != nil {
+		return nil, errors.Wrap(err, "escaping module version")
+	}
 
 	cl.loop(&err, func(s single) {
 		rc, err = s.zip(ctx, mod, ver)

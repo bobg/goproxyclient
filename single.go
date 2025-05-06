@@ -28,6 +28,7 @@ func newSingle(url string, hc *http.Client) single {
 	return single{baseURL: url, client: hc}
 }
 
+// Note, modpath is already escaped.
 func (s single) list(ctx context.Context, modpath string) ([]string, error) {
 	q := fmt.Sprintf("%s/%s/@v/list", s.baseURL, modpath)
 
@@ -57,19 +58,23 @@ func (s single) list(ctx context.Context, modpath string) ([]string, error) {
 	return versions, errors.Wrapf(sc.Err(), "scanning response from GET %s", q)
 }
 
+// Note, modpath and version are already escaped.
 func (s single) info(ctx context.Context, modpath, version string) (string, time.Time, map[string]json.RawMessage, error) {
 	q := fmt.Sprintf("%s/%s/@v/%s.info", s.baseURL, modpath, version)
 	return s.handleInfoRequest(ctx, q)
 }
 
+// Note, modpath and version are already escaped.
 func (s single) mod(ctx context.Context, modpath, version string) (io.ReadCloser, error) {
 	return s.getContent(ctx, modpath, version, "mod")
 }
 
+// Note, modpath and version are already escaped.
 func (s single) zip(ctx context.Context, modpath, version string) (io.ReadCloser, error) {
 	return s.getContent(ctx, modpath, version, "zip")
 }
 
+// Note, modpath and version are already escaped.
 func (s single) getContent(ctx context.Context, modpath, version, suffix string) (io.ReadCloser, error) {
 	q := fmt.Sprintf("%s/%s/@v/%s.%s", s.baseURL, modpath, version, suffix)
 
@@ -93,6 +98,7 @@ func (s single) getContent(ctx context.Context, modpath, version, suffix string)
 
 // Latest gets info about the latest version of a Go module.
 // Its return values are the same as for [Info].
+// Note, modpath is already escaped.
 func (s single) latest(ctx context.Context, modpath string) (string, time.Time, map[string]json.RawMessage, error) {
 	q := fmt.Sprintf("%s/%s/@latest", s.baseURL, modpath)
 	return s.handleInfoRequest(ctx, q)
