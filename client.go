@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"iter"
 	"net/http"
 	"strings"
 	"time"
@@ -28,76 +29,82 @@ type nextSingle struct {
 
 // New creates a new [Client] talking to a sequence of one or more Go module proxies.
 //
-// The proxies are specified as described for the GOPROXY environment variable at https://go.dev/ref/mod#goproxy-protocol.
-// That string specifies a list of proxy URLs separated by commas (,) or pipes (|).
-// For each query type, the proxies are tried in sequence,
-// and the result of the first successful request is returned.
-//
-// If a request is unsuccessful, then whether the next proxy in the sequence is tried
-// depends on whether a comma or a pipe introduces the next proxy in the sequence:
-//
-//   - If a comma, then the next proxy is tried only if the failure is a 404 (Not Found) or 410 (Gone) error.
-//   - If a pipe, then the next proxy is tried regardless of the failure.
-//
-// This function ignores any entry in the input string that is "direct", "off", or empty.
-// If no proxy URL is found, it uses https://proxy.golang.org by default.
+// It calls [Parse] on the input string to get the sequence of proxies,
+// ignoring any "direct," "off," or empty entries.
+// If no proxies are specified,
+// it uses https://proxy.golang.org by default.
 //
 // If hc is non-nil, it will use that HTTP client for all requests,
 // otherwise it will use a default HTTP client
 // (but a distinct one from [http.DefaultClient]).
 func New(goproxy string, hc *http.Client) Client {
-	var (
-		first       single
-		afterAnyErr bool
-	)
+	seq := Parse(goproxy)
+	next, stop := iter.Pull2(seq)
+	defer stop()
+
+	var first single
+
 	for {
-		end := strings.IndexFunc(goproxy, func(r rune) bool { return r == ',' || r == '|' })
-		if end < 0 {
-			switch goproxy {
-			case "direct", "off", "":
-				return Client{first: newSingle("https://proxy.golang.org", hc)}
-			}
-			return Client{first: newSingle(goproxy, hc)}
+		val, _, ok := next()
+		if !ok {
+			return Client{first: newSingle("https://proxy.golang.org", hc)}
 		}
-		part := goproxy[:end]
-		switch part {
+		switch val {
 		case "direct", "off", "":
-			goproxy = goproxy[end+1:]
 			continue
 		}
-		first = newSingle(part, hc)
-		afterAnyErr = goproxy[end] == '|'
-		goproxy = goproxy[end+1:]
+		first = newSingle(val, hc)
 		break
 	}
 
 	var rest []nextSingle
 
-	for goproxy != "" {
-		end := strings.IndexFunc(goproxy, func(r rune) bool { return r == ',' || r == '|' })
-		if end < 0 {
-			switch goproxy {
-			case "direct", "off", "":
-				// do nothing
-			default:
-				rest = append(rest, nextSingle{client: newSingle(goproxy, hc), afterAnyErr: afterAnyErr})
-			}
+	for {
+		val, afterAnyErr, ok := next()
+		if !ok {
 			break
 		}
-
-		part := goproxy[:end]
-		switch part {
+		switch val {
 		case "direct", "off", "":
-			afterAnyErr = goproxy[end] == '|'
-			goproxy = goproxy[end+1:]
 			continue
 		}
-		rest = append(rest, nextSingle{client: newSingle(part, hc), afterAnyErr: afterAnyErr})
-		afterAnyErr = goproxy[end] == '|'
-		goproxy = goproxy[end+1:]
+		rest = append(rest, nextSingle{
+			client:      newSingle(val, hc),
+			afterAnyErr: afterAnyErr,
+		})
 	}
 
 	return Client{first: first, rest: rest}
+}
+
+// Parse parses a GOPROXY string structured as described at https://go.dev/ref/mod#goproxy-protocol:
+// a sequence of strings separated by commas (,) or pipes (|).
+// The strings are URLs to use in Go module proxy queries,
+// or the special strings "direct" or "off".
+// Comma means "try the next proxy only if the previous one failed with a 404 (Not Found) or 410 (Gone) error."
+// Pipe means "try the next proxy regardless of the previous error."
+//
+// The result is a sequence of pairs:
+// the string, and boolean meaning "after any error"
+// (i.e., whether the preceding separator was a pipe).
+// The boolean is false for the first element in the sequence.
+func Parse(goproxy string) iter.Seq2[string, bool] {
+	return func(yield func(string, bool) bool) {
+		var afterAnyErr bool
+		for {
+			end := strings.IndexFunc(goproxy, func(r rune) bool { return r == ',' || r == '|' })
+			if end < 0 {
+				yield(goproxy, afterAnyErr)
+				return
+			}
+			part := goproxy[:end]
+			if !yield(part, afterAnyErr) {
+				return
+			}
+			afterAnyErr = goproxy[end] == '|'
+			goproxy = goproxy[end+1:]
+		}
+	}
 }
 
 func (cl Client) loop(errptr *error, f func(single)) {
