@@ -412,3 +412,34 @@ var midMod string
 
 //go:embed testdata/github.com/bobg/subcmd/v2/@v/v2.3.0.mod
 var subcmdMod string
+
+func TestParse(t *testing.T) {
+	type pair struct {
+		val         string
+		afterAnyErr bool
+	}
+
+	cases := []struct {
+		in   string
+		want []pair
+	}{
+		{"", []pair{{"", false}}},
+		{"foo", []pair{{"foo", false}}},
+		{"foo,bar", []pair{{"foo", false}, {"bar", false}}},
+		{"foo|bar", []pair{{"foo", false}, {"bar", true}}},
+		{"foo,bar|baz", []pair{{"foo", false}, {"bar", false}, {"baz", true}}},
+	}
+
+	for i, tc := range cases {
+		t.Run(fmt.Sprintf("case_%02d", i+1), func(t *testing.T) {
+			seq := Parse(tc.in)
+			var got []pair
+			for val, afterAnyErr := range seq {
+				got = append(got, pair{val: val, afterAnyErr: afterAnyErr})
+			}
+			if !slices.Equal(got, tc.want) {
+				t.Errorf("got %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
