@@ -106,8 +106,8 @@ func TestClients(t *testing.T) {
 			if err == nil {
 				t.Fatal("got nil, want error")
 			}
-			var codeErr CodeErr
-			if !errors.As(err, &codeErr) {
+			codeErr, ok := errors.AsType[CodeErr](err)
+			if !ok {
 				t.Fatalf("got %v, want a CodeErr", err)
 			}
 			if code := codeErr.Code(); code != http.StatusForbidden {
@@ -338,8 +338,8 @@ func TestClients(t *testing.T) {
 					if err == nil {
 						t.Fatal("got nil, want error")
 					}
-					var codeErr CodeErr
-					if !errors.As(err, &codeErr) {
+					codeErr, ok := errors.AsType[CodeErr](err)
+					if !ok {
 						t.Fatalf("got %v, want a CodeErr", err)
 					}
 					if code := codeErr.Code(); code != http.StatusForbidden {
@@ -348,8 +348,8 @@ func TestClients(t *testing.T) {
 				})
 				t.Run("list", func(t *testing.T) {
 					_, err := cl.List(ctx, "github.com/bobg/subcmd/v2")
-					var codeErr CodeErr
-					if !errors.As(err, &codeErr) {
+					codeErr, ok := errors.AsType[CodeErr](err)
+					if !ok {
 						t.Fatalf("got %v, want a CodeErr", err)
 					}
 					if code := codeErr.Code(); code != http.StatusForbidden {
@@ -359,8 +359,8 @@ func TestClients(t *testing.T) {
 
 				t.Run("info", func(t *testing.T) {
 					_, _, _, err := cl.Info(ctx, "github.com/bobg/subcmd/v2", wantSubcmdVersion)
-					var codeErr CodeErr
-					if !errors.As(err, &codeErr) {
+					codeErr, ok := errors.AsType[CodeErr](err)
+					if !ok {
 						t.Fatalf("got %v, want a CodeErr", err)
 					}
 					if code := codeErr.Code(); code != http.StatusForbidden {
@@ -374,8 +374,9 @@ func TestClients(t *testing.T) {
 						rc.Close()
 						t.Fatal("got nil, want error")
 					}
-					var codeErr CodeErr
-					if !errors.As(err, &codeErr) {
+
+					codeErr, ok := errors.AsType[CodeErr](err)
+					if !ok {
 						t.Fatalf("got %v, want a CodeErr", err)
 					}
 					if code := codeErr.Code(); code != http.StatusForbidden {

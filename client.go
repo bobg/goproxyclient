@@ -158,7 +158,7 @@ func (cl Client) Info(ctx context.Context, mod, ver string) (string, time.Time, 
 		canonicalVer, tm, j, err = s.info(ctx, mod, ver)
 	})
 
-	return canonicalVer, tm, j, err
+	return canonicalVer, tm, j, errors.Wrap(err, "getting info")
 }
 
 // Latest gets info about the latest version of a Go module.
@@ -180,7 +180,7 @@ func (cl Client) Latest(ctx context.Context, mod string) (string, time.Time, map
 		canonicalVer, tm, j, err = s.latest(ctx, mod)
 	})
 
-	return canonicalVer, tm, j, err
+	return canonicalVer, tm, j, errors.Wrap(err, "getting latest version info")
 }
 
 // List lists the available versions of a Go module.
@@ -201,7 +201,7 @@ func (cl Client) List(ctx context.Context, mod string) ([]string, error) {
 		versions, err = s.list(ctx, mod)
 	})
 
-	return versions, err
+	return versions, errors.Wrap(err, "listing versions")
 }
 
 // Mod gets the go.mod file for a specific version of a Go module.
@@ -224,7 +224,7 @@ func (cl Client) Mod(ctx context.Context, mod, ver string) (io.ReadCloser, error
 		rc, err = s.mod(ctx, mod, ver)
 	})
 
-	return rc, err
+	return rc, errors.Wrap(err, "getting go.mod file")
 }
 
 // Zip gets the contents of a specific version of a Go module as a zip file.
@@ -247,7 +247,7 @@ func (cl Client) Zip(ctx context.Context, mod, ver string) (io.ReadCloser, error
 		rc, err = s.zip(ctx, mod, ver)
 	})
 
-	return rc, err
+	return rc, errors.Wrap(err, "getting zip file")
 }
 
 // CodeErr is the type of an error that has an associated HTTP status code.
@@ -262,8 +262,8 @@ var _ CodeErr = mid.CodeErr{}
 
 // IsNotFound tests an error to see if it is a [CodeErr] and has status code 404 (Not Found) or 410 (Gone).
 func IsNotFound(err error) bool {
-	var codeErr CodeErr
-	if !errors.As(err, &codeErr) {
+	codeErr, ok := errors.AsType[CodeErr](err)
+	if !ok {
 		return false
 	}
 	code := codeErr.Code()
